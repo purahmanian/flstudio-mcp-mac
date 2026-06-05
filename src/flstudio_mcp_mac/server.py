@@ -26,9 +26,9 @@ def _bridge_call(command: str, params: dict[str, Any] | None = None) -> dict[str
             "ok": False,
             "error": str(exc),
             "hint": (
-                "Start this MCP server, then configure FL Studio MIDI settings with "
-                "`FLStudioMCP Request` as this controller's input and "
-                "`FLStudioMCP Response` as its output."
+                "Start FL Studio, then configure MIDI settings with `FLStudioMCP Request` "
+                "as the enabled controller input and `FLStudioMCP Response` as its output. "
+                "The MCP server starts a singleton local MIDI daemon automatically."
             ),
         }
 
@@ -197,4 +197,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

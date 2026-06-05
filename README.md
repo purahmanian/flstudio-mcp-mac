@@ -26,7 +26,7 @@ Most FL Studio MCP work today is Windows-oriented. macOS has a cleaner CoreMIDI 
 - FL Studio's MIDI scripting API is not a complete DAW API.
 - Loading plugins, loading arbitrary audio files, and rendering/exporting are not implemented here.
 - Persistent note writing goes through the included Piano Roll script. The MCP server queues notes; you run `Scripts > FL Studio MCP Apply` in the target Piano Roll.
-- Live bridge setup requires FL Studio's MIDI settings to map the request/response ports.
+- Live bridge setup requires FL Studio's MIDI settings to map the request/response ports. The MCP server starts a singleton local MIDI daemon so Claude Desktop, Claude Code, and terminal tests share the same CoreMIDI endpoints.
 
 ## Install
 
@@ -44,17 +44,19 @@ The installer copies:
 
 ## Configure FL Studio on macOS
 
-1. Start the MCP server once so it creates the virtual CoreMIDI ports:
+1. Start the MCP server once so it starts the local MIDI daemon and creates the virtual CoreMIDI ports:
 
    ```bash
    flstudio-mcp-mac
    ```
 
+   You can stop this foreground MCP process after the ports appear. The background daemon keeps the `FLStudioMCP Request` and `FLStudioMCP Response` ports available for all MCP clients.
+
 2. Open FL Studio and go to `Options > MIDI Settings`.
 3. In the input list, choose `FLStudioMCP Request`.
 4. Set `Controller type` to `FL Studio MCP Mac`.
 5. Set the controller output to `FLStudioMCP Response`.
-6. Restart the MCP client if needed.
+6. Restart the MCP client if needed. If duplicate `FLStudioMCP` ports appear, quit old MCP server processes and start the v0.1.1+ daemon again.
 
 ## MCP Client Config
 
@@ -119,6 +121,8 @@ Set `FLSTUDIO_MCP_BRIDGE=mock` to run the MCP server with deterministic in-memor
 ```bash
 FLSTUDIO_MCP_BRIDGE=mock python3 -m flstudio_mcp_mac
 ```
+
+Normal live mode uses a background daemon. For low-level debugging, set `FLSTUDIO_MCP_BRIDGE=direct` to make one MCP process own the virtual MIDI ports directly.
 
 For live FL Studio validation steps, see [docs/testing.md](docs/testing.md).
 

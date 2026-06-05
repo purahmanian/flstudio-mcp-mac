@@ -92,12 +92,12 @@ For broader Claude Desktop distribution, package this as a desktop extension. Th
 ```bash
 npm install -g @anthropic-ai/mcpb
 mcpb validate manifest.json
-mcpb pack . dist/flstudio-mcp-mac-0.1.0.mcpb
+mcpb pack . dist/flstudio-mcp-mac-0.1.1.mcpb
 ```
 
 Then double-click the generated `.mcpb`, drag it into Claude Desktop, or install it from `Settings > Extensions > Advanced settings > Install Extension`.
 
-This uses the MCPB `uv` runtime support so the extension can install Python dependencies from `pyproject.toml`. It still needs final install testing inside Claude Desktop on a Mac with FL Studio installed.
+This uses the MCPB `uv` runtime support so the extension can install Python dependencies from `pyproject.toml`. In v0.1.1 and later, the extension starts the singleton MIDI daemon automatically so Claude Desktop shares the same `FLStudioMCP Request` and `FLStudioMCP Response` ports with terminal tests and other local MCP clients.
 
 ## Claude.ai Remote Connectors
 

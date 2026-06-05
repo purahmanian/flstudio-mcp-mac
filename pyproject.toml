@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "flstudio-mcp-mac"
-version = "0.1.0"
+version = "0.1.1"
 description = "macOS-first MCP bridge for FL Studio using CoreMIDI and FL Studio Python MIDI scripts."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -39,6 +39,7 @@ dev = [
 
 [project.scripts]
 flstudio-mcp-mac = "flstudio_mcp_mac.server:main"
+flstudio-mcp-mac-daemon = "flstudio_mcp_mac.daemon:main"
 flstudio-mcp-mac-install = "flstudio_mcp_mac.install:main"
 
 [tool.hatch.build.targets.wheel]

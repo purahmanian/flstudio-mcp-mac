@@ -51,7 +51,7 @@ Package install smoke test:
 rm -rf dist build
 .venv/bin/python -m build
 python3 -m venv /tmp/flstudio-mcp-mac-wheel-venv
-/tmp/flstudio-mcp-mac-wheel-venv/bin/python -m pip install dist/flstudio_mcp_mac-0.1.0-py3-none-any.whl
+/tmp/flstudio-mcp-mac-wheel-venv/bin/python -m pip install dist/flstudio_mcp_mac-0.1.1-py3-none-any.whl
 /tmp/flstudio-mcp-mac-wheel-venv/bin/python - <<'PY'
 from flstudio_mcp_mac.server import create_app
 
@@ -71,11 +71,13 @@ python3 -m pip install .
 flstudio-mcp-mac-install
 ```
 
-Start the MCP server in a terminal and leave it running:
+Start the MCP server in a terminal once. This starts the singleton MIDI daemon and creates the CoreMIDI ports:
 
 ```bash
 flstudio-mcp-mac
 ```
+
+You may stop the foreground MCP server after the ports appear. The daemon keeps running in the background and owns the virtual MIDI ports for all MCP clients and terminal tests.
 
 Open FL Studio on macOS, then configure MIDI:
 
@@ -103,6 +105,19 @@ Expected results:
 - `fl_set_tempo` changes the FL Studio project tempo.
 - `fl_transport` starts and stops playback.
 - Mixer and channel tools return visible tracks/channels from the current project.
+
+The same live path can be tested from a terminal. Do not set `FLSTUDIO_MCP_BRIDGE=direct`; the default daemon mode is what prevents duplicate CoreMIDI endpoints:
+
+```bash
+PYTHONPATH=src .venv/bin/python - <<'PY'
+from flstudio_mcp_mac.server import _bridge_call
+
+print(_bridge_call("get_status"))
+print(_bridge_call("set_tempo", {"bpm": 128}))
+print(_bridge_call("transport", {"action": "play"}))
+print(_bridge_call("transport", {"action": "stop"}))
+PY
+```
 
 ## MIDI File Test
 
@@ -139,3 +154,5 @@ In FL Studio:
 - If commands reach FL Studio but never return, the controller output is probably not set to `FLStudioMCP Response`.
 - If Piano Roll notes do not appear, confirm the queue file exists at `~/Music/FLStudioMCP/piano_roll_queue.json` and run the script from an open Piano Roll window.
 - If the virtual ports do not show up, start `flstudio-mcp-mac` before opening FL Studio's MIDI settings.
+- If duplicate `FLStudioMCP Request` or `FLStudioMCP Response` ports appear, quit old MCP server processes and restart the v0.1.1+ daemon. The old direct bridge mode creates per-process virtual ports; daemon mode creates one shared port pair.
+- The daemon socket defaults to `~/Library/Application Support/flstudio-mcp-mac/bridge.sock`, and logs default to `~/Library/Application Support/flstudio-mcp-mac/daemon.log`.

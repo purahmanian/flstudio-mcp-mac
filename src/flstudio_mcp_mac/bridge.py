@@ -4,10 +4,15 @@ from __future__ import annotations
 
 import os
 import queue
+import json
+import socket
+import subprocess
+import sys
 import threading
 import time
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from .protocol import DEFAULT_CHANNEL, FrameDecoder, ProtocolError, encode_payload
@@ -15,6 +20,8 @@ from .protocol import DEFAULT_CHANNEL, FrameDecoder, ProtocolError, encode_paylo
 DEFAULT_REQUEST_PORT = "FLStudioMCP Request"
 DEFAULT_RESPONSE_PORT = "FLStudioMCP Response"
 DEFAULT_TIMEOUT_SECONDS = 8.0
+DEFAULT_DAEMON_START_TIMEOUT_SECONDS = 8.0
+DAEMON_APP_DIR = "flstudio-mcp-mac"
 
 
 class BridgeError(RuntimeError):
@@ -31,6 +38,47 @@ class BridgeTimeoutError(BridgeError):
 
 def mock_bridge_enabled() -> bool:
     return os.getenv("FLSTUDIO_MCP_BRIDGE", "").strip().lower() in {"mock", "test"}
+
+
+def bridge_mode() -> str:
+    value = os.getenv("FLSTUDIO_MCP_BRIDGE", "daemon").strip().lower()
+    if value in {"", "daemon", "socket"}:
+        return "daemon"
+    if value in {"mock", "test"}:
+        return "mock"
+    if value in {"direct", "midi", "coremidi"}:
+        return "direct"
+    raise BridgeError(
+        "FLSTUDIO_MCP_BRIDGE must be one of: daemon, direct, mock. "
+        f"Got {value!r}."
+    )
+
+
+def daemon_state_dir() -> Path:
+    configured = os.getenv("FLSTUDIO_MCP_DAEMON_DIR")
+    if configured:
+        return Path(configured).expanduser()
+    return Path.home() / "Library" / "Application Support" / DAEMON_APP_DIR
+
+
+def daemon_socket_path() -> Path:
+    configured = os.getenv("FLSTUDIO_MCP_DAEMON_SOCKET")
+    if configured:
+        return Path(configured).expanduser()
+    return daemon_state_dir() / "bridge.sock"
+
+
+def daemon_log_path() -> Path:
+    configured = os.getenv("FLSTUDIO_MCP_DAEMON_LOG")
+    if configured:
+        return Path(configured).expanduser()
+    return daemon_state_dir() / "daemon.log"
+
+
+def daemon_start_timeout_seconds() -> float:
+    return float(
+        os.getenv("FLSTUDIO_MCP_DAEMON_START_TIMEOUT", DEFAULT_DAEMON_START_TIMEOUT_SECONDS)
+    )
 
 
 @dataclass(frozen=True)
@@ -156,6 +204,151 @@ class MidiBridge:
             response_queue.put_nowait(payload)
         except queue.Full:
             pass
+
+
+class DaemonBridge:
+    """Client bridge that proxies MCP tool calls to the singleton MIDI daemon."""
+
+    def __init__(
+        self,
+        config: BridgeConfig | None = None,
+        socket_path: Path | None = None,
+        autostart: bool = True,
+    ) -> None:
+        self.config = config or BridgeConfig.from_env()
+        self.socket_path = socket_path or daemon_socket_path()
+        self.autostart = autostart
+
+    @property
+    def connected(self) -> bool:
+        return self._server_available(timeout=0.1)
+
+    def close(self) -> None:
+        return None
+
+    def call(self, command: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        try:
+            return self._call_once(command, params or {})
+        except OSError as first_exc:
+            if not self.autostart:
+                raise BridgeError(
+                    f"FL Studio MCP daemon is not reachable at {self.socket_path}"
+                ) from first_exc
+
+            self._ensure_daemon_started()
+            try:
+                return self._call_once(command, params or {})
+            except OSError as exc:
+                raise BridgeError(
+                    f"FL Studio MCP daemon is not reachable at {self.socket_path}"
+                ) from exc
+
+    def _call_once(self, command: str, params: dict[str, Any]) -> dict[str, Any]:
+        request = {
+            "command": command,
+            "params": params,
+            "timeout_seconds": self.config.timeout_seconds,
+        }
+        timeout = max(self.config.timeout_seconds + 1.0, 2.0)
+
+        try:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+                sock.settimeout(timeout)
+                sock.connect(str(self.socket_path))
+                sock.sendall(json.dumps(request).encode("utf-8") + b"\n")
+                with sock.makefile("rb") as reader:
+                    line = reader.readline()
+        except socket.timeout as exc:
+            raise BridgeTimeoutError(
+                f"FL Studio MCP daemon did not respond within {timeout:.1f}s"
+            ) from exc
+
+        if not line:
+            raise BridgeError("FL Studio MCP daemon closed the connection without a response")
+
+        try:
+            response = json.loads(line.decode("utf-8"))
+        except json.JSONDecodeError as exc:
+            raise BridgeError("FL Studio MCP daemon returned invalid JSON") from exc
+
+        if not isinstance(response, dict):
+            raise BridgeError("FL Studio MCP daemon returned an invalid response")
+
+        if not response.get("ok", False):
+            raise BridgeError(str(response.get("error", "FL Studio daemon command failed")))
+
+        result = response.get("result", {})
+        if not isinstance(result, dict):
+            return {"value": result}
+        return result
+
+    def _ensure_daemon_started(self) -> None:
+        self.socket_path.parent.mkdir(parents=True, exist_ok=True)
+        lock_path = self.socket_path.with_suffix(self.socket_path.suffix + ".lock")
+
+        with lock_path.open("a", encoding="utf-8") as lock_file:
+            import fcntl
+
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            try:
+                if self._server_available(timeout=0.25):
+                    return
+                process = self._start_daemon_process()
+                self._wait_for_daemon(process)
+            finally:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+    def _start_daemon_process(self) -> subprocess.Popen[bytes]:
+        log_path = daemon_log_path()
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
+        env = os.environ.copy()
+        env["FLSTUDIO_MCP_DAEMON_SOCKET"] = str(self.socket_path)
+        env.setdefault("PYTHONUNBUFFERED", "1")
+
+        package_parent = Path(__file__).resolve().parents[1]
+        pythonpath = env.get("PYTHONPATH")
+        env["PYTHONPATH"] = (
+            str(package_parent) if not pythonpath else str(package_parent) + os.pathsep + pythonpath
+        )
+
+        with log_path.open("ab") as log_file:
+            return subprocess.Popen(
+                [sys.executable, "-m", "flstudio_mcp_mac.daemon"],
+                stdin=subprocess.DEVNULL,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                env=env,
+                close_fds=True,
+                start_new_session=True,
+            )
+
+    def _wait_for_daemon(self, process: subprocess.Popen[bytes]) -> None:
+        timeout = daemon_start_timeout_seconds()
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if self._server_available(timeout=0.1):
+                return
+            if process.poll() is not None:
+                raise BridgeError(
+                    "FL Studio MCP daemon exited while starting. "
+                    f"See {daemon_log_path()} for details."
+                )
+            time.sleep(0.05)
+
+        raise BridgeTimeoutError(
+            f"FL Studio MCP daemon did not start within {timeout:.1f}s. "
+            f"See {daemon_log_path()} for details."
+        )
+
+    def _server_available(self, timeout: float) -> bool:
+        try:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+                sock.settimeout(timeout)
+                sock.connect(str(self.socket_path))
+            return True
+        except OSError:
+            return False
 
 
 class MockBridge:
@@ -294,13 +487,19 @@ class MockBridge:
             channel["selected"] = channel["index"] == index
 
 
-_bridge: MidiBridge | MockBridge | None = None
+_bridge: MidiBridge | DaemonBridge | MockBridge | None = None
 
 
-def get_bridge() -> MidiBridge | MockBridge:
+def get_bridge() -> MidiBridge | DaemonBridge | MockBridge:
     global _bridge
     if _bridge is None:
-        _bridge = MockBridge() if mock_bridge_enabled() else MidiBridge()
+        mode = bridge_mode()
+        if mode == "mock":
+            _bridge = MockBridge()
+        elif mode == "direct":
+            _bridge = MidiBridge()
+        else:
+            _bridge = DaemonBridge()
     return _bridge
 
 

@@ -2,9 +2,9 @@
   "manifest_version": "0.4",
   "name": "flstudio-mcp-mac",
   "display_name": "FL Studio MCP Mac",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "macOS-first MCP bridge for FL Studio using CoreMIDI and FL Studio Python MIDI scripts.",
-  "long_description": "Expose FL Studio transport, tempo, mixer, channel, MIDI file, and Piano Roll queue workflows to MCP clients. This extension runs locally on macOS and requires FL Studio's MIDI settings to connect the FLStudioMCP Request and Response virtual ports.",
+  "long_description": "Expose FL Studio transport, tempo, mixer, channel, MIDI file, and Piano Roll queue workflows to MCP clients. This extension runs locally on macOS and uses a singleton MIDI daemon so multiple MCP clients share one stable FLStudioMCP Request/Response port pair.",
   "author": {
     "name": "Puyarahmanian"
   },
