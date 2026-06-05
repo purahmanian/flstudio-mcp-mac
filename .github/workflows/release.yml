@@ -1,0 +1,83 @@
+name: Release
+
+# On version tags: runs tests, builds the wheel/sdist and the MCPB bundle,
+# attaches everything to a GitHub Release, and publishes to PyPI via OIDC
+# trusted publishing. No tokens or secrets anywhere.
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install and test
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install ".[dev]" build
+          .venv/bin/python -m pytest -q
+          .venv/bin/python -m ruff check .
+
+      - name: Build wheel and sdist
+        run: .venv/bin/python -m build
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Build MCPB bundle
+        run: |
+          npx -y @anthropic-ai/mcpb validate manifest.json
+          npx -y @anthropic-ai/mcpb pack . "dist/flstudio-mcp-mac-${GITHUB_REF_NAME#v}.mcpb"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  github-release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Create GitHub Release with artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes
+
+  pypi-publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Remove non-PyPI artifacts
+        run: rm -f dist/*.mcpb
+
+      - name: Publish to PyPI (trusted publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
