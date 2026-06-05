@@ -18,6 +18,14 @@ PYTHONPATH=src .venv/bin/python -m pytest -q
 .venv/bin/python -m py_compile "fl_scripts/piano_roll/FL Studio MCP Apply.pyscript"
 ```
 
+The test suite includes a real stdio MCP client/server round trip. It starts the server with:
+
+```bash
+FLSTUDIO_MCP_BRIDGE=mock
+```
+
+That mock mode lists the real MCP tools and exercises all tool handlers without requiring FL Studio.
+
 Installer smoke test:
 
 ```bash

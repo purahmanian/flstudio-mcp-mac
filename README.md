@@ -114,6 +114,12 @@ python3 -m pip install ".[dev]"
 PYTHONPATH=src pytest
 ```
 
+Set `FLSTUDIO_MCP_BRIDGE=mock` to run the MCP server with deterministic in-memory FL Studio responses for protocol tests:
+
+```bash
+FLSTUDIO_MCP_BRIDGE=mock python3 -m flstudio_mcp_mac
+```
+
 For live FL Studio validation steps, see [docs/testing.md](docs/testing.md).
 
 ## Protocol

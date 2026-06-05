@@ -29,6 +29,10 @@ class BridgeTimeoutError(BridgeError):
     """Raised when FL Studio does not respond before the deadline."""
 
 
+def mock_bridge_enabled() -> bool:
+    return os.getenv("FLSTUDIO_MCP_BRIDGE", "").strip().lower() in {"mock", "test"}
+
+
 @dataclass(frozen=True)
 class BridgeConfig:
     request_port: str = DEFAULT_REQUEST_PORT
@@ -154,12 +158,154 @@ class MidiBridge:
             pass
 
 
-_bridge: MidiBridge | None = None
+class MockBridge:
+    """Deterministic bridge used for MCP protocol tests without FL Studio."""
+
+    def __init__(self) -> None:
+        self.tempo = 120.0
+        self.playing = False
+        self.recording = False
+        self.loop_mode = 1
+        self.selected_channel = 0
+        self.tracks = [
+            {
+                "index": 0,
+                "name": "Master",
+                "volume": 1.0,
+                "volume_db": 0.0,
+                "pan": 0.0,
+                "muted": False,
+                "solo": False,
+                "selected": True,
+            },
+            {
+                "index": 1,
+                "name": "Insert 1",
+                "volume": 0.8,
+                "volume_db": -3.0,
+                "pan": 0.0,
+                "muted": False,
+                "solo": False,
+                "selected": False,
+            },
+        ]
+        self.channels = [
+            {
+                "index": 0,
+                "name": "Sampler",
+                "volume": 0.8,
+                "pan": 0.0,
+                "muted": False,
+                "solo": False,
+                "selected": True,
+                "target_mixer_track": 1,
+            },
+            {
+                "index": 1,
+                "name": "Keys",
+                "volume": 0.75,
+                "pan": 0.0,
+                "muted": False,
+                "solo": False,
+                "selected": False,
+                "target_mixer_track": 1,
+            },
+        ]
+
+    @property
+    def connected(self) -> bool:
+        return True
+
+    def close(self) -> None:
+        return None
+
+    def call(self, command: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        params = params or {}
+        if command == "get_status":
+            return self._status()
+        if command == "transport":
+            return self._transport(str(params.get("action", "")))
+        if command == "set_tempo":
+            self.tempo = float(params["bpm"])
+            return self._status()
+        if command == "mixer_tracks":
+            limit = int(params.get("limit", 32))
+            return {"tracks": self.tracks[:limit], "count": len(self.tracks)}
+        if command == "set_mixer_track":
+            return {"track": self._set_item(self.tracks, params)}
+        if command == "channels":
+            limit = int(params.get("limit", 64))
+            return {"channels": self.channels[:limit], "count": len(self.channels)}
+        if command == "set_channel":
+            item = self._set_item(self.channels, params)
+            if params.get("selected") is True:
+                self._select_channel(int(params["index"]))
+            return {"channel": item}
+        raise BridgeError(f"unknown command: {command}")
+
+    def _status(self) -> dict[str, Any]:
+        return {
+            "mock": True,
+            "version": "mock",
+            "tempo": self.tempo,
+            "playing": self.playing,
+            "recording": self.recording,
+            "loop_mode": self.loop_mode,
+            "song_pos": 0,
+            "song_length": 0,
+            "selected_channel": self.selected_channel,
+            "active_pattern": 1,
+            "mixer_track_count": len(self.tracks),
+        }
+
+    def _transport(self, action: str) -> dict[str, Any]:
+        if action == "play":
+            self.playing = True
+        elif action == "stop":
+            self.playing = False
+        elif action == "record_toggle":
+            self.recording = not self.recording
+        elif action == "rewind":
+            pass
+        elif action == "song_mode":
+            self.loop_mode = 1
+        elif action == "pattern_mode":
+            self.loop_mode = 0
+        elif action == "metronome_toggle":
+            pass
+        else:
+            raise BridgeError(f"unsupported transport action: {action}")
+        return self._status()
+
+    def _set_item(self, items: list[dict[str, Any]], params: dict[str, Any]) -> dict[str, Any]:
+        index = int(params["index"])
+        try:
+            item = items[index]
+        except IndexError as exc:
+            raise BridgeError(f"index out of range: {index}") from exc
+        for key in ("volume", "pan", "muted", "solo", "name", "selected"):
+            if key in params:
+                item[key] = params[key]
+        return item
+
+    def _select_channel(self, index: int) -> None:
+        self.selected_channel = index
+        for channel in self.channels:
+            channel["selected"] = channel["index"] == index
 
 
-def get_bridge() -> MidiBridge:
+_bridge: MidiBridge | MockBridge | None = None
+
+
+def get_bridge() -> MidiBridge | MockBridge:
     global _bridge
     if _bridge is None:
-        _bridge = MidiBridge()
+        _bridge = MockBridge() if mock_bridge_enabled() else MidiBridge()
     return _bridge
 
+
+def reset_bridge() -> None:
+    global _bridge
+    if _bridge is not None:
+        _bridge.close()
+    _bridge = None

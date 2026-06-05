@@ -1,0 +1,95 @@
+name: test
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package and dev tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build
+          python -m pip install ".[dev]"
+
+      - name: Run tests
+        run: PYTHONPATH=src python -m pytest -q
+
+      - name: Run lint
+        run: ruff check src tests
+
+      - name: Compile Python sources
+        run: |
+          python -m compileall -q src tests
+          python -m py_compile fl_scripts/midi_controller/FLStudioMCP/device_FLStudioMCP.py
+          python -m py_compile "fl_scripts/piano_roll/FL Studio MCP Apply.pyscript"
+
+      - name: Build package
+        run: |
+          rm -rf dist build
+          python -m build
+
+      - name: Smoke test wheel install and MCP stdio
+        run: |
+          python -m venv /tmp/flstudio-mcp-wheel
+          /tmp/flstudio-mcp-wheel/bin/python -m pip install dist/flstudio_mcp_mac-*.whl
+          /tmp/flstudio-mcp-wheel/bin/flstudio-mcp-mac-install --user-data-dir /tmp/flstudio-mcp-install
+          test -f "/tmp/flstudio-mcp-install/Hardware/FLStudioMCP/device_FLStudioMCP.py"
+          test -f "/tmp/flstudio-mcp-install/Piano roll scripts/FL Studio MCP Apply.pyscript"
+          /tmp/flstudio-mcp-wheel/bin/python - <<'PY'
+          import anyio
+          import os
+          import tempfile
+          from pathlib import Path
+
+          from mcp.client.session import ClientSession
+          from mcp.client.stdio import StdioServerParameters, stdio_client
+
+          async def main():
+              output_dir = Path(tempfile.mkdtemp(prefix="flstudio-mcp-ci-"))
+              server = StdioServerParameters(
+                  command="/tmp/flstudio-mcp-wheel/bin/flstudio-mcp-mac",
+                  env={**os.environ, "FLSTUDIO_MCP_BRIDGE": "mock"},
+              )
+              async with stdio_client(server) as streams:
+                  async with ClientSession(*streams) as session:
+                      await session.initialize()
+                      tools = await session.list_tools()
+                      assert len(tools.tools) == 9
+                      tempo = await session.call_tool("fl_set_tempo", {"bpm": 128})
+                      assert tempo.structuredContent["tempo"] == 128
+                      midi = await session.call_tool(
+                          "fl_create_midi_file",
+                          {
+                              "name": "CI Clip",
+                              "output_dir": str(output_dir),
+                              "notes": [
+                                  {
+                                      "pitch": 60,
+                                      "start": 0,
+                                      "duration": 1,
+                                      "velocity": 96,
+                                  }
+                              ],
+                          },
+                      )
+                      assert Path(midi.structuredContent["path"]).exists()
+
+          anyio.run(main)
+          PY
