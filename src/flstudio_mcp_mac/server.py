@@ -7,6 +7,8 @@ import re
 from pathlib import Path
 from typing import Any, Literal
 
+from mcp.types import ToolAnnotations
+
 from .bridge import BridgeError, get_bridge
 from .midi_file import default_output_dir, write_midi_from_dicts
 
@@ -44,7 +46,14 @@ def create_app() -> Any:
 
     mcp = FastMCP("FL Studio MCP Mac")
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title='FL Studio health + status',
+            readOnlyHint=True,
+            destructiveHint=False,
+            openWorldHint=True,
+        )
+    )
     def fl_health() -> dict[str, Any]:
         """Check the FL Studio bridge and return live project status when connected."""
 
@@ -53,7 +62,14 @@ def create_app() -> Any:
             return result
         return {"ok": True, "status": result}
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title='FL Studio transport control',
+            readOnlyHint=False,
+            destructiveHint=False,
+            openWorldHint=True,
+        )
+    )
     def fl_transport(
         action: Literal[
             "play",
@@ -69,7 +85,14 @@ def create_app() -> Any:
 
         return _bridge_call("transport", {"action": action})
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title='Set project tempo',
+            readOnlyHint=False,
+            destructiveHint=False,
+            openWorldHint=True,
+        )
+    )
     def fl_set_tempo(bpm: float) -> dict[str, Any]:
         """Set the current FL Studio project tempo."""
 
@@ -77,7 +100,14 @@ def create_app() -> Any:
             return {"ok": False, "error": "bpm must be between 20 and 999"}
         return _bridge_call("set_tempo", {"bpm": bpm})
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title='Read mixer tracks',
+            readOnlyHint=True,
+            destructiveHint=False,
+            openWorldHint=True,
+        )
+    )
     def fl_mixer_tracks(limit: int = 32) -> dict[str, Any]:
         """Read mixer track names, volume, pan, mute, and solo state."""
 
@@ -85,7 +115,14 @@ def create_app() -> Any:
             return {"ok": False, "error": "limit must be between 1 and 128"}
         return _bridge_call("mixer_tracks", {"limit": limit})
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title='Set mixer track',
+            readOnlyHint=False,
+            destructiveHint=False,
+            openWorldHint=True,
+        )
+    )
     def fl_set_mixer_track(
         index: int,
         volume: float | None = None,
@@ -113,7 +150,14 @@ def create_app() -> Any:
             params["name"] = name
         return _bridge_call("set_mixer_track", params)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title='Read channel rack',
+            readOnlyHint=True,
+            destructiveHint=False,
+            openWorldHint=True,
+        )
+    )
     def fl_channels(limit: int = 64) -> dict[str, Any]:
         """Read Channel Rack channel state."""
 
@@ -121,7 +165,14 @@ def create_app() -> Any:
             return {"ok": False, "error": "limit must be between 1 and 256"}
         return _bridge_call("channels", {"limit": limit})
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title='Set channel',
+            readOnlyHint=False,
+            destructiveHint=False,
+            openWorldHint=True,
+        )
+    )
     def fl_set_channel(
         index: int,
         selected: bool | None = None,
@@ -149,7 +200,14 @@ def create_app() -> Any:
             params["name"] = name
         return _bridge_call("set_channel", params)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title='Create MIDI file',
+            readOnlyHint=False,
+            destructiveHint=False,
+            openWorldHint=True,
+        )
+    )
     def fl_create_midi_file(
         name: str,
         notes: list[dict[str, Any]],
@@ -166,7 +224,14 @@ def create_app() -> Any:
             return {"ok": False, "error": str(exc)}
         return {"ok": True, "path": str(path), "note_count": len(notes)}
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title='Queue Piano Roll notes',
+            readOnlyHint=False,
+            destructiveHint=False,
+            openWorldHint=True,
+        )
+    )
     def fl_queue_piano_roll_notes(
         notes: list[dict[str, Any]],
         clear_existing: bool = False,

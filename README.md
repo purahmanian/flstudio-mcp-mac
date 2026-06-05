@@ -135,3 +135,21 @@ The bridge sends base64 JSON over MIDI control-change frames on channel 16:
 - CC 122: frame end
 
 The FL script only accepts whitelisted command names and returns one JSON response for each request.
+
+## Privacy
+
+This server runs entirely on your machine. It collects no telemetry and stores
+no data on any remote service. It communicates only with your local FL Studio
+instance over macOS virtual MIDI ports (CoreMIDI), and writes files only where
+you ask: generated MIDI files and the Piano Roll queue JSON under your local
+Music folder. No account, API key, or network connection is required, and
+nothing you do in FL Studio leaves your computer.
+
+## Built by
+
+Built by **Puya Ventures LLC**. I build custom MCP servers and AI integrations.
+Get in touch: purahmanian@gmail.com | Portfolio: https://puyarahmanian.com
+
+## License
+
+MIT. See [LICENSE](./LICENSE).
