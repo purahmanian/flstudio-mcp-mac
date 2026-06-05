@@ -1,5 +1,7 @@
 # FL Studio MCP Mac
 
+<!-- mcp-name: io.github.purahmanian/flstudio-mcp-mac -->
+
 macOS-first MCP bridge for FL Studio. It exposes FL Studio transport, mixer, channel, MIDI export, and Piano Roll note-apply workflows to MCP clients such as Claude Desktop, Claude Code, Cursor, and other MCP-capable tools.
 
 This is an alpha MVP. It is intentionally scoped around FL Studio's documented Python MIDI scripting and Piano Roll scripting APIs. It does not promise full headless FL Studio automation.
@@ -31,7 +33,7 @@ Most FL Studio MCP work today is Windows-oriented. macOS has a cleaner CoreMIDI 
 From this repo:
 
 ```bash
-python3 -m pip install -e ".[dev]"
+python3 -m pip install .
 flstudio-mcp-mac-install
 ```
 
@@ -55,6 +57,8 @@ The installer copies:
 6. Restart the MCP client if needed.
 
 ## MCP Client Config
+
+For detailed setup across Claude Desktop, Claude Code, Cursor, Windsurf, PyPI, and the MCP Registry, see [docs/publishing.md](docs/publishing.md).
 
 Example Claude Desktop config:
 
@@ -106,9 +110,11 @@ Times are in beats. MIDI pitch uses the standard 0-127 scale.
 ## Development
 
 ```bash
-python3 -m pip install -e ".[dev]"
-pytest
+python3 -m pip install ".[dev]"
+PYTHONPATH=src pytest
 ```
+
+For live FL Studio validation steps, see [docs/testing.md](docs/testing.md).
 
 ## Protocol
 
@@ -119,4 +125,3 @@ The bridge sends base64 JSON over MIDI control-change frames on channel 16:
 - CC 122: frame end
 
 The FL script only accepts whitelisted command names and returns one JSON response for each request.
-

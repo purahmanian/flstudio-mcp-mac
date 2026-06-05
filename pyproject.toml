@@ -26,6 +26,11 @@ dependencies = [
   "python-rtmidi>=1.5.8",
 ]
 
+[project.urls]
+Homepage = "https://github.com/purahmanian/flstudio-mcp-mac"
+Repository = "https://github.com/purahmanian/flstudio-mcp-mac"
+Issues = "https://github.com/purahmanian/flstudio-mcp-mac/issues"
+
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0",
@@ -41,6 +46,18 @@ packages = ["src/flstudio_mcp_mac"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "fl_scripts" = "flstudio_mcp_mac/fl_scripts"
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/README.md",
+  "/LICENSE",
+  "/pyproject.toml",
+  "/server.json",
+  "/docs",
+  "/fl_scripts",
+  "/src",
+  "/tests",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
