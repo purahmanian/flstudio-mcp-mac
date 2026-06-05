@@ -106,7 +106,15 @@ def _handle_command(command, params):
         return _transport(params)
     if command == "set_tempo":
         bpm = float(params["bpm"])
-        mixer.setCurrentTempo(bpm)
+        # FL stores tempo in milli-BPM (130 BPM -> 130000). The documented
+        # way to set it from a script is a REC event; raw BPM into
+        # mixer.setCurrentTempo raises "Range error".
+        target = int(round(bpm * 1000))
+        general.processRECEvent(
+            midi.REC_Tempo,
+            target,
+            midi.REC_Control | midi.REC_UpdateControl,
+        )
         return _get_status()
     if command == "mixer_tracks":
         return _mixer_tracks(int(params.get("limit", 32)))

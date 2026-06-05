@@ -51,7 +51,7 @@ Package install smoke test:
 rm -rf dist build
 .venv/bin/python -m build
 python3 -m venv /tmp/flstudio-mcp-mac-wheel-venv
-/tmp/flstudio-mcp-mac-wheel-venv/bin/python -m pip install dist/flstudio_mcp_mac-0.1.1-py3-none-any.whl
+/tmp/flstudio-mcp-mac-wheel-venv/bin/python -m pip install dist/flstudio_mcp_mac-0.1.2-py3-none-any.whl
 /tmp/flstudio-mcp-mac-wheel-venv/bin/python - <<'PY'
 from flstudio_mcp_mac.server import create_app
 

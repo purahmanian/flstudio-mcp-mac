@@ -92,7 +92,7 @@ For broader Claude Desktop distribution, package this as a desktop extension. Th
 ```bash
 npm install -g @anthropic-ai/mcpb
 mcpb validate manifest.json
-mcpb pack . dist/flstudio-mcp-mac-0.1.1.mcpb
+mcpb pack . dist/flstudio-mcp-mac-0.1.2.mcpb
 ```
 
 Then double-click the generated `.mcpb`, drag it into Claude Desktop, or install it from `Settings > Extensions > Advanced settings > Install Extension`.
