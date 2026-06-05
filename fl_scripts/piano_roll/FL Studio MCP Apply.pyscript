@@ -1,0 +1,42 @@
+import json
+from pathlib import Path
+
+import flpianoroll as flp
+
+QUEUE_PATH = Path.home() / "Music" / "FLStudioMCP" / "piano_roll_queue.json"
+
+
+def createDialog():
+    form = flp.ScriptDialog(
+        "FL Studio MCP Apply",
+        "Apply notes queued by the FL Studio MCP Mac server.",
+    )
+    form.addInputText("Queue Path", str(QUEUE_PATH))
+    return form
+
+
+def apply(form):
+    path = Path(form.getInputValue("Queue Path")).expanduser()
+    if not path.exists():
+        flp.Utils.ShowMessage("No queued MCP notes found at: " + str(path))
+        return
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if payload.get("clear_existing"):
+        flp.score.clearNotes(True)
+
+    ppq = flp.score.PPQ
+    for item in payload.get("notes", []):
+        note = flp.Note()
+        note.number = int(item["pitch"])
+        note.time = int(round(float(item.get("start", 0.0)) * ppq))
+        note.length = int(round(float(item.get("duration", 1.0)) * ppq))
+        note.velocity = max(0.0, min(1.0, float(item.get("velocity", 96)) / 127.0))
+        note.pan = max(0.0, min(1.0, float(item.get("pan", 0.5))))
+        note.color = int(item.get("color", item.get("channel", 0))) % 16
+        note.selected = bool(item.get("selected", True))
+        note.muted = bool(item.get("muted", False))
+        flp.score.addNote(note)
+
+    flp.Utils.ShowMessage("Applied " + str(len(payload.get("notes", []))) + " MCP notes.")
+
