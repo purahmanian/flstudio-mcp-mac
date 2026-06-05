@@ -46,6 +46,12 @@ jobs:
           rm -rf dist build
           python -m build
 
+      - name: Validate and pack MCPB
+        run: |
+          npx -y @anthropic-ai/mcpb validate manifest.json
+          npx -y @anthropic-ai/mcpb pack . dist/flstudio-mcp-mac-0.1.0.mcpb
+          test -f dist/flstudio-mcp-mac-0.1.0.mcpb
+
       - name: Smoke test wheel install and MCP stdio
         run: |
           python -m venv /tmp/flstudio-mcp-wheel

@@ -1,0 +1,73 @@
+{
+  "manifest_version": "0.4",
+  "name": "flstudio-mcp-mac",
+  "display_name": "FL Studio MCP Mac",
+  "version": "0.1.0",
+  "description": "macOS-first MCP bridge for FL Studio using CoreMIDI and FL Studio Python MIDI scripts.",
+  "long_description": "Expose FL Studio transport, tempo, mixer, channel, MIDI file, and Piano Roll queue workflows to MCP clients. This extension runs locally on macOS and requires FL Studio's MIDI settings to connect the FLStudioMCP Request and Response virtual ports.",
+  "author": {
+    "name": "Puyarahmanian"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/purahmanian/flstudio-mcp-mac.git"
+  },
+  "homepage": "https://github.com/purahmanian/flstudio-mcp-mac",
+  "documentation": "https://github.com/purahmanian/flstudio-mcp-mac#readme",
+  "support": "https://github.com/purahmanian/flstudio-mcp-mac/issues",
+  "server": {
+    "type": "uv",
+    "entry_point": "mcpb_entry.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": ["run", "--directory", "${__dirname}", "mcpb_entry.py"]
+    }
+  },
+  "tools": [
+    {
+      "name": "fl_health",
+      "description": "Check the FL Studio bridge and return live project status when connected."
+    },
+    {
+      "name": "fl_transport",
+      "description": "Control FL Studio transport playback, recording, mode, rewind, and metronome state."
+    },
+    {
+      "name": "fl_set_tempo",
+      "description": "Set the current FL Studio project tempo."
+    },
+    {
+      "name": "fl_mixer_tracks",
+      "description": "Read FL Studio mixer track names, volume, pan, mute, and solo state."
+    },
+    {
+      "name": "fl_set_mixer_track",
+      "description": "Mutate a single FL Studio mixer track by explicit index."
+    },
+    {
+      "name": "fl_channels",
+      "description": "Read FL Studio Channel Rack channel state."
+    },
+    {
+      "name": "fl_set_channel",
+      "description": "Mutate a Channel Rack channel by explicit index."
+    },
+    {
+      "name": "fl_create_midi_file",
+      "description": "Create a Standard MIDI file that can be imported into FL Studio."
+    },
+    {
+      "name": "fl_queue_piano_roll_notes",
+      "description": "Queue notes for the included FL Studio Piano Roll script to apply."
+    }
+  ],
+  "tools_generated": false,
+  "keywords": ["fl-studio", "mcp", "music-production", "midi", "macos"],
+  "license": "MIT",
+  "compatibility": {
+    "platforms": ["darwin"],
+    "runtimes": {
+      "python": ">=3.10"
+    }
+  }
+}

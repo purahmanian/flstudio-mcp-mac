@@ -52,6 +52,8 @@ include = [
   "/README.md",
   "/LICENSE",
   "/pyproject.toml",
+  "/manifest.json",
+  "/mcpb_entry.py",
   "/server.json",
   "/docs",
   "/fl_scripts",

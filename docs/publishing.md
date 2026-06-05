@@ -87,17 +87,17 @@ Restart Claude Desktop after editing the config. Check the server from Claude De
 
 ## Claude Desktop Extension
 
-For broader Claude Desktop distribution, package this as a desktop extension:
+For broader Claude Desktop distribution, package this as a desktop extension. The repo includes `manifest.json`, `.mcpbignore`, and `mcpb_entry.py` for MCPB packaging:
 
 ```bash
 npm install -g @anthropic-ai/mcpb
-mcpb init
-mcpb pack
+mcpb validate manifest.json
+mcpb pack . dist/flstudio-mcp-mac-0.1.0.mcpb
 ```
 
 Then double-click the generated `.mcpb`, drag it into Claude Desktop, or install it from `Settings > Extensions > Advanced settings > Install Extension`.
 
-This is the best "one-click install" path for Claude Desktop, but it still needs a packaging pass because desktop extensions should bundle a predictable runtime story for Python dependencies. For this project, that likely means using the MCPB `uv` runtime support or bundling a clean virtualenv that includes `mcp` and `python-rtmidi`, then testing on a clean Mac with FL Studio installed.
+This uses the MCPB `uv` runtime support so the extension can install Python dependencies from `pyproject.toml`. It still needs final install testing inside Claude Desktop on a Mac with FL Studio installed.
 
 ## Claude.ai Remote Connectors
 
