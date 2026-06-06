@@ -1,8 +1,8 @@
 name: Release
 
-# On version tags: runs tests, builds the wheel/sdist and the MCPB bundle,
-# attaches everything to a GitHub Release, and publishes to PyPI via OIDC
-# trusted publishing. No tokens or secrets anywhere.
+# On a version tag: test, build wheel/sdist + MCPB, attach to a GitHub Release,
+# publish to PyPI via OIDC trusted publishing, then publish metadata to the
+# official MCP registry via GitHub OIDC. No tokens or secrets anywhere.
 
 on:
   push:
@@ -81,3 +81,26 @@ jobs:
 
       - name: Publish to PyPI (trusted publishing)
         uses: pypa/gh-action-pypi-publish@release/v1
+
+  registry-publish:
+    needs: pypi-publish
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Sync server.json version to the tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          python3 -c "import json;f='server.json';j=json.load(open(f));j['version']='$VERSION';j['packages'][0]['version']='$VERSION';json.dump(j,open(f,'w'),indent=2);open(f,'a').write('\n')"
+
+      - name: Publish to MCP registry (GitHub OIDC)
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish
